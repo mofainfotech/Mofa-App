@@ -733,8 +733,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hrs > 0) parts.push(`${hrs} hr${hrs > 1 ? 's' : ''}`);
     if (mins > 0) parts.push(`${mins} min${mins > 1 ? 's' : ''}`);
     if (secs > 0 || parts.length === 0) parts.push(`${secs} sec${secs > 1 ? 's' : ''}`);
+    return parts.join(' ');
+  }
+
   // Anti-Bot Cookies Modal Logic
   const btnOpenCookieModal = document.getElementById('btnOpenCookieModal');
+
   const cookieModal = document.getElementById('cookieModal');
   const btnCloseCookieModal = document.getElementById('btnCloseCookieModal');
   const btnCloseCookieBtn = document.getElementById('btnCloseCookieBtn');

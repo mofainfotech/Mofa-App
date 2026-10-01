@@ -733,6 +733,110 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hrs > 0) parts.push(`${hrs} hr${hrs > 1 ? 's' : ''}`);
     if (mins > 0) parts.push(`${mins} min${mins > 1 ? 's' : ''}`);
     if (secs > 0 || parts.length === 0) parts.push(`${secs} sec${secs > 1 ? 's' : ''}`);
-    return parts.join(' ');
+  // Anti-Bot Cookies Modal Logic
+  const btnOpenCookieModal = document.getElementById('btnOpenCookieModal');
+  const cookieModal = document.getElementById('cookieModal');
+  const btnCloseCookieModal = document.getElementById('btnCloseCookieModal');
+  const btnCloseCookieBtn = document.getElementById('btnCloseCookieBtn');
+  const btnSaveCookies = document.getElementById('btnSaveCookies');
+  const cookieFileInput = document.getElementById('cookieFileInput');
+  const cookieTextInput = document.getElementById('cookieTextInput');
+  const cookieStatusAlert = document.getElementById('cookieStatusAlert');
+  const cookieBtnText = document.getElementById('cookieBtnText');
+
+  async function checkCookieStatus() {
+    try {
+      const res = await fetch('api/cookies');
+      const data = await res.json();
+      if (data.has_cookies) {
+        if (cookieBtnText) cookieBtnText.textContent = '🍪 Cookies Active';
+        if (btnOpenCookieModal) {
+          btnOpenCookieModal.style.background = 'rgba(34, 197, 94, 0.15)';
+          btnOpenCookieModal.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+          btnOpenCookieModal.style.color = '#4ade80';
+        }
+        if (cookieStatusAlert) {
+          cookieStatusAlert.style.background = 'rgba(34, 197, 94, 0.15)';
+          cookieStatusAlert.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+          cookieStatusAlert.style.color = '#4ade80';
+          cookieStatusAlert.innerHTML = `✅ <strong>Cookies Loaded:</strong> Active (${Math.round(data.size / 1024)} KB). YouTube bot challenges are bypassed!`;
+        }
+      } else {
+        if (cookieBtnText) cookieBtnText.textContent = '🍪 Anti-Bot Cookies';
+        if (btnOpenCookieModal) {
+          btnOpenCookieModal.style.background = 'rgba(239, 68, 68, 0.15)';
+          btnOpenCookieModal.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          btnOpenCookieModal.style.color = '#f87171';
+        }
+        if (cookieStatusAlert) {
+          cookieStatusAlert.style.background = 'rgba(245, 158, 11, 0.15)';
+          cookieStatusAlert.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          cookieStatusAlert.style.color = '#fbbf24';
+          cookieStatusAlert.innerHTML = `⚠️ <strong>No cookies active:</strong> Datacenter IP might get challenged with "Sign in to confirm you're not a bot".`;
+        }
+      }
+    } catch (_) {}
+  }
+
+  checkCookieStatus();
+
+  if (btnOpenCookieModal) {
+    btnOpenCookieModal.addEventListener('click', () => {
+      cookieModal.style.display = 'flex';
+      checkCookieStatus();
+    });
+  }
+
+  function closeCookieModal() {
+    if (cookieModal) cookieModal.style.display = 'none';
+  }
+
+  if (btnCloseCookieModal) btnCloseCookieModal.addEventListener('click', closeCookieModal);
+  if (btnCloseCookieBtn) btnCloseCookieBtn.addEventListener('click', closeCookieModal);
+
+  if (cookieFileInput) {
+    cookieFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          cookieTextInput.value = event.target.result;
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  if (btnSaveCookies) {
+    btnSaveCookies.addEventListener('click', async () => {
+      const content = cookieTextInput.value.trim();
+      if (!content) {
+        alert('Please paste cookies content or select a cookies.txt file.');
+        return;
+      }
+      btnSaveCookies.disabled = true;
+      btnSaveCookies.textContent = 'Saving...';
+      try {
+        const res = await fetch('api/cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies: content }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Cookies saved successfully! YouTube bot check bypassed.', 'success');
+          checkCookieStatus();
+          closeCookieModal();
+        } else {
+          showToast(data.error || 'Failed to save cookies.', 'error');
+        }
+      } catch (err) {
+        showToast('Error saving cookies: ' + err, 'error');
+      } finally {
+        btnSaveCookies.disabled = false;
+        btnSaveCookies.textContent = 'Save & Apply Cookies';
+      }
+    });
   }
 });
+

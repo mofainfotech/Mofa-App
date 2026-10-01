@@ -18,10 +18,25 @@ if ($isWindows) {
 }
 
 $downloadsDir = __DIR__ . '/downloads';
+$cookieFile   = __DIR__ . '/cookies.txt';
+
+// Check if cookies provided via Environment Variable
+$envCookies = getenv('YOUTUBE_COOKIES');
+if (!empty($envCookies) && (!file_exists($cookieFile) || filesize($cookieFile) < 10)) {
+    @file_put_contents($cookieFile, $envCookies);
+}
+
+function getCookieParam($cookieFile) {
+    if (file_exists($cookieFile) && filesize($cookieFile) > 10) {
+        return "--cookies " . escapeshellarg($cookieFile);
+    }
+    return "";
+}
 
 if (!is_dir($downloadsDir)) {
     mkdir($downloadsDir, 0777, true);
 }
+
 
 function executeCliCommand($cmd) {
     return shell_exec($cmd);
@@ -87,6 +102,34 @@ if ($path === '/api/status') {
     exit;
 }
 
+if ($path === '/api/cookies') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        $content = $data['cookies'] ?? $_POST['cookies'] ?? '';
+        if (empty($content) && !empty($_FILES['file']['tmp_name'])) {
+            $content = file_get_contents($_FILES['file']['tmp_name']);
+        }
+        if (!empty($content)) {
+            file_put_contents($cookieFile, trim($content));
+            echo json_encode(['success' => true, 'message' => 'Cookies saved successfully!']);
+            exit;
+        } else {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'No cookie content provided.']);
+            exit;
+        }
+    } else {
+        $hasCookies = file_exists($cookieFile) && filesize($cookieFile) > 10;
+        echo json_encode([
+            'success'     => true,
+            'has_cookies' => $hasCookies,
+            'size'        => $hasCookies ? filesize($cookieFile) : 0,
+        ]);
+        exit;
+    }
+}
+
 if ($path === '/api/formats') {
     $rawInput = json_decode(file_get_contents('php://input'), true);
     $url = $_GET['url'] ?? $_POST['url'] ?? ($rawInput['url'] ?? '');
@@ -102,9 +145,11 @@ if ($path === '/api/formats') {
         exit;
     }
 
+    $cookieParam = getCookieParam($cookieFile);
     $safeUrl = escapeshellarg($url);
-    $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android_creator,android,ios\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
+    $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
+
 
 
     $info = json_decode($output, true);
@@ -253,12 +298,14 @@ if ($path === '/api/prepare') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $cmdOutput = '';
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
+    $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
         $cmdOutput = executeCliCommand($cmd);
     }
@@ -356,12 +403,14 @@ if ($path === '/api/download') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $cmdOutput = '';
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
+    $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
         $cmdOutput = executeCliCommand($cmd);
     }

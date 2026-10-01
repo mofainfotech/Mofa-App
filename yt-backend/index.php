@@ -75,8 +75,8 @@ if ($path === '/' || $path === '') {
 }
 
 if ($path === '/api/status') {
-    $version = getYtDlpVersion($ytdlp);
-    $ffmpegOk = file_exists($ffmpeg);
+    $version = getYtDlpVersion($ytdlp, $nullDev);
+    $ffmpegOk = $isWindows ? file_exists($ffmpeg) : (!empty(trim(shell_exec("which $ffmpeg 2>/dev/null") ?? '')));
     echo json_encode([
         'api'      => 'Fast YouTube Downloader Backend (Core PHP)',
         'yt_dlp'   => $version ?: 'not found',
@@ -103,7 +103,7 @@ if ($path === '/api/formats') {
     }
 
     $safeUrl = escapeshellarg($url);
-    $cmd = escapeshellarg($ytdlp) . " -J --no-playlist --no-warnings --no-update --js-runtimes node --socket-timeout 20 $safeUrl 2>&1";
+    $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android,web,tv\" -J --no-playlist --no-warnings --no-update --js-runtimes node --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
 
     $info = json_decode($output, true);
@@ -116,6 +116,7 @@ if ($path === '/api/formats') {
         ]);
         exit;
     }
+
 
 
     $videoTitle = $info['title'] ?? 'YouTube_Video';
@@ -250,14 +251,16 @@ if ($path === '/api/prepare') {
 
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $cmdOutput = '';
+    $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 --ffmpeg-location " . escapeshellarg($ffmpeg) . " --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android,web,tv\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " --no-playlist -f $safeFmt --ffmpeg-location " . escapeshellarg($ffmpeg) . " --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android,web,tv\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
         $cmdOutput = executeCliCommand($cmd);
     }
+
 
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         http_response_code(500);
@@ -350,14 +353,16 @@ if ($path === '/api/download') {
 
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $cmdOutput = '';
+    $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 --ffmpeg-location " . escapeshellarg($ffmpeg) . " --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android,web,tv\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " --no-playlist -f $safeFmt --ffmpeg-location " . escapeshellarg($ffmpeg) . " --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=android,web,tv\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
         $cmdOutput = executeCliCommand($cmd);
     }
+
 
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         http_response_code(500);

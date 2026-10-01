@@ -10,9 +10,11 @@ $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 if ($isWindows) {
     $ytdlp = 'C:\\Users\\Administrator\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\Scripts\\yt-dlp.exe';
     $ffmpeg = 'C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe';
+    $nullDev = 'NUL';
 } else {
     $ytdlp = 'yt-dlp';
     $ffmpeg = 'ffmpeg';
+    $nullDev = '/dev/null';
 }
 
 $downloadsDir = __DIR__ . '/downloads';
@@ -25,7 +27,7 @@ function executeCliCommand($cmd) {
     return shell_exec($cmd);
 }
 
-function getYtDlpVersion($ytdlp) {
+function getYtDlpVersion($ytdlp, $nullDev = 'NUL') {
     static $cachedVersion = null;
     if ($cachedVersion !== null) return $cachedVersion;
     $verFile = sys_get_temp_dir() . '/ytdlp_version.cache';
@@ -33,13 +35,25 @@ function getYtDlpVersion($ytdlp) {
         $cachedVersion = trim(file_get_contents($verFile));
         return $cachedVersion;
     }
-    $cmd = escapeshellarg($ytdlp) . ' --version 2> NUL';
+    $cmd = escapeshellarg($ytdlp) . " --version 2> $nullDev";
     $cachedVersion = trim(executeCliCommand($cmd) ?? '2026.08.19');
     @file_put_contents($verFile, $cachedVersion);
     return $cachedVersion;
 }
 
-$path = $_SERVER['PATH_INFO'] ?? '/';
+$requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$path = $_SERVER['PATH_INFO'] ?? '';
+if (empty($path)) {
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    if (!empty($scriptName) && strpos($requestUri, $scriptName) === 0) {
+        $path = substr($requestUri, strlen($scriptName));
+    } else {
+        $path = $requestUri;
+    }
+}
+$path = '/' . trim($path, '/');
+if ($path === '//') $path = '/';
+
 
 // Serve HTML app if requested via browser at root
 if ($path === '/' || $path === '') {
@@ -89,21 +103,20 @@ if ($path === '/api/formats') {
     }
 
     $safeUrl = escapeshellarg($url);
-    $cmd = escapeshellarg($ytdlp) . " -J --no-playlist --no-warnings --no-update --js-runtimes node --socket-timeout 10 $safeUrl 2> NUL";
+    $cmd = escapeshellarg($ytdlp) . " -J --no-playlist --no-warnings --no-update --js-runtimes node --socket-timeout 20 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
-
-    if (!$output) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'yt-dlp returned no output.']);
-        exit;
-    }
 
     $info = json_decode($output, true);
     if (json_last_error() !== JSON_ERROR_NONE || empty($info['formats'])) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Could not parse video details.']);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'Could not parse video details.',
+            'details' => substr($output ?? 'No output', 0, 500)
+        ]);
         exit;
     }
+
 
     $videoTitle = $info['title'] ?? 'YouTube_Video';
     $formatsMap = [];

@@ -13,8 +13,10 @@ RUN apt-get update && apt-get install -y \
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite & allow .htaccess
+RUN a2enmod rewrite \
+    && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
+
 
 # Copy backend files
 COPY . /var/www/html/

@@ -16,14 +16,19 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
-# Update Apache port to support Render/Koyeb dynamic PORT environment variable (default 80)
-RUN sed -i 's/80/${PORT:-80}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
-
 # Copy backend files
 COPY . /var/www/html/
 
 # Create downloads folder with write permissions
 RUN mkdir -p /var/www/html/downloads && chmod 777 /var/www/html/downloads
 
+# Create startup script to bind Apache to dynamic $PORT provided by Render
+RUN echo '#!/bin/sh' > /start.sh \
+    && echo 'PORT="${PORT:-80}"' >> /start.sh \
+    && echo 'sed -i "s/Listen 80/Listen $PORT/g" /etc/apache2/ports.conf' >> /start.sh \
+    && echo 'sed -i "s/<VirtualHost \*:80>/<VirtualHost \*:$PORT>/g" /etc/apache2/sites-available/000-default.conf' >> /start.sh \
+    && echo 'exec apache2-foreground' >> /start.sh \
+    && chmod +x /start.sh
+
 EXPOSE 80
-CMD ["apache2-foreground"]
+CMD ["/start.sh"]

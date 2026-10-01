@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseTube - Fast YouTube Downloader & Streamer</title>
+  <meta name="description" content="Download YouTube videos in 4K, 1080p, 720p MP4 or high quality MP3 audio directly using high-performance yt-dlp and ffmpeg core backend.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <!-- Top Navigation / Header -->
+  <header class="navbar" id="mainNavbar">
+    <div class="nav-container">
+      <div class="brand-logo" id="brandLogo">
+        <div class="logo-icon-wrap">
+          <svg class="logo-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Pulse<span class="gradient-text">Tube</span></span>
+          <span class="brand-badge">PRO BACKEND</span>
+        </div>
+      </div>
+
+      <!-- Server Diagnostics Pill -->
+      <div class="server-status-pill" id="serverStatusPill" title="Click to refresh backend status">
+        <span class="status-indicator-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Checking server...</span>
+        <div class="system-meta-badges" id="systemBadges" style="display: none;">
+          <span class="meta-tag" id="badgeYtDlp">yt-dlp</span>
+          <span class="meta-tag" id="badgePhp">PHP</span>
+          <span class="meta-tag" id="badgeFfmpeg">FFmpeg</span>
+        </div>
+        <button class="status-refresh-btn" id="btnRefreshStatus" aria-label="Refresh backend status">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-wrapper" id="mainContent">
+    
+    <!-- Hero Section -->
+    <section class="hero-section" id="heroSection">
+      <div class="hero-chip">
+        <span class="sparkle-icon">⚡</span> High Performance yt-dlp & FFmpeg Powered Engine
+      </div>
+      <h1 class="hero-title">
+        Download YouTube Media in <br>
+        <span class="hero-gradient-text">Full HD, 4K & MP3 Audio</span>
+      </h1>
+      <p class="hero-subtitle">
+        Enter any YouTube video or Shorts link below to extract direct download streams, high-bitrate audio, and merged video files instantly.
+      </p>
+
+      <!-- URL Input Box Card -->
+      <div class="search-card" id="searchCard">
+        <form class="search-form" id="searchForm" onsubmit="return false;">
+          <div class="input-glow-wrapper" id="inputWrapper">
+            <span class="yt-icon-box">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+            </span>
+            <input 
+              type="url" 
+              id="videoUrlInput" 
+              class="url-input" 
+              placeholder="Paste YouTube URL (e.g. https://www.youtube.com/watch?v=...)" 
+              autocomplete="off" 
+              spellcheck="false"
+              required
+            >
+            <div class="input-actions">
+              <button type="button" class="btn-input-action" id="btnClearInput" title="Clear text" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+              <button type="button" class="btn-input-action" id="btnPasteClipboard" title="Paste from clipboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Paste</span>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn-fetch" id="btnFetch">
+            <span class="btn-content">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <span>Get Formats</span>
+            </span>
+            <span class="btn-loader" style="display: none;">
+              <span class="spinner"></span>
+              <span>Extracting...</span>
+            </span>
+          </button>
+        </form>
+
+        <!-- Quick Demo Chips -->
+        <div class="sample-chips-row">
+          <span class="sample-label">Quick test:</span>
+          <button type="button" class="sample-chip" data-url="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+            🎵 Rick Astley (4K / MP3)
+          </button>
+          <button type="button" class="sample-chip" data-url="https://www.youtube.com/watch?v=jNQXAC9IVRw">
+            🐘 Me at the zoo (19s)
+          </button>
+          <button type="button" class="sample-chip" data-url="https://www.youtube.com/watch?v=aqz-KE-bpKQ">
+            🎬 Big Buck Bunny (FHD)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading Skeleton Card -->
+    <section class="loading-state-card" id="loadingStateCard" style="display: none;">
+      <div class="loader-pulse-bar"></div>
+      <div class="loading-info">
+        <div class="loading-spinner-large"></div>
+        <div class="loading-text-group">
+          <h3 class="loading-heading" id="loadingHeading">Analyzing Video via Backend...</h3>
+          <p class="loading-subtext" id="loadingSubtext">yt-dlp is extracting available streams and manifest data</p>
+        </div>
+      </div>
+      <div class="loading-skeleton-preview">
+        <div class="skeleton skeleton-thumb"></div>
+        <div class="skeleton-meta">
+          <div class="skeleton skeleton-title"></div>
+          <div class="skeleton skeleton-subtitle"></div>
+          <div class="skeleton skeleton-button"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error Alert Card -->
+    <section class="error-alert-card" id="errorAlertCard" style="display: none;">
+      <div class="error-icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="error-content">
+        <h3 class="error-title" id="errorTitle">Extraction Failed</h3>
+        <p class="error-message" id="errorMessage">Unable to fetch formats. Please verify the URL and backend status.</p>
+      </div>
+      <button type="button" class="btn-dismiss-error" id="btnDismissError" aria-label="Dismiss error">✕</button>
+    </section>
+
+    <!-- Result Showcase Section -->
+    <section class="results-section" id="resultsSection" style="display: none;">
+      
+      <!-- Video Details Header Card -->
+      <div class="video-meta-card" id="videoMetaCard">
+        <div class="video-thumb-container">
+          <img src="" alt="Video thumbnail" class="video-thumbnail" id="videoThumbnail" loading="lazy">
+          <span class="video-duration-badge" id="videoDurationBadge">00:00</span>
+          <button class="thumb-play-overlay" id="btnPreviewModalThumb" title="Preview video in player">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="video-details-container">
+          <div class="video-tags-row">
+            <span class="video-platform-tag">YouTube</span>
+            <span class="video-quality-tag" id="videoMaxQualityTag">High Quality</span>
+            <span class="video-format-count" id="videoFormatCount">0 Formats</span>
+          </div>
+          <h2 class="video-title" id="videoTitle">Video Title Goes Here</h2>
+          
+          <div class="video-stats-row">
+            <div class="stat-item">
+              <span class="stat-label">Duration:</span>
+              <span class="stat-value" id="videoStatDuration">0m 00s</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Source URL:</span>
+              <a href="#" target="_blank" rel="noopener noreferrer" class="stat-link" id="videoSourceLink">
+                <span>Open on YouTube</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="meta-card-actions">
+            <button class="btn-meta-action" id="btnCopyTitle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy Title</span>
+            </button>
+            <button class="btn-meta-action" id="btnCopyUrl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <span>Share Link</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Format Filter Tabs & Download Grid -->
+      <div class="formats-wrapper" id="formatsWrapper">
+        <div class="formats-header-bar">
+          <div class="tabs-nav" id="formatsTabsNav">
+            <button class="tab-btn active" data-filter="all" id="tabAll">
+              <span>All Formats</span>
+              <span class="tab-count" id="countAll">0</span>
+            </button>
+            <button class="tab-btn" data-filter="video" id="tabVideo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              <span>Video (MP4)</span>
+              <span class="tab-count" id="countVideo">0</span>
+            </button>
+            <button class="tab-btn" data-filter="audio" id="tabAudio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+              </svg>
+              <span>Audio (MP3)</span>
+              <span class="tab-count" id="countAudio">0</span>
+            </button>
+          </div>
+          <div class="formats-info-hint">
+            <span>✨ Highest available audio & video merged via FFmpeg</span>
+          </div>
+        </div>
+
+        <!-- Formats Grid -->
+        <div class="formats-grid" id="formatsGrid">
+          <!-- Dynamically populated format cards -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Progress Drawer / Banner -->
+    <div class="download-status-banner" id="downloadStatusBanner" style="display: none;">
+      <div class="download-banner-inner">
+        <div class="banner-spinner"></div>
+        <div class="banner-text">
+          <strong id="bannerTitle">Preparing Download...</strong>
+          <span id="bannerSubtitle">yt-dlp is processing streams and FFmpeg is merging audio/video. Download will start automatically!</span>
+        </div>
+        <button class="btn-banner-close" id="btnCloseBanner" aria-label="Close banner">✕</button>
+      </div>
+    </div>
+
+    <!-- Recent History Section -->
+    <section class="history-section" id="historySection">
+      <div class="history-header">
+        <div class="history-title-group">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="history-icon">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <h3 class="history-title">Recent Videos</h3>
+        </div>
+        <button class="btn-clear-history" id="btnClearHistory" title="Clear search history">Clear History</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty" id="historyEmpty">
+          <p>No recent downloads yet. Paste a link above to get started!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Backend API Explorer / Features Section -->
+    <section class="api-docs-section" id="apiDocsSection">
+      <div class="api-docs-header" id="apiDocsToggle">
+        <div class="api-title-row">
+          <span class="code-bracket">{ }</span>
+          <h3>Backend Endpoints & Features</h3>
+          <span class="api-expand-pill">Explore Endpoints ▼</span>
+        </div>
+        <p class="api-description">This backend provides core PHP REST endpoints with zero external dependencies, powered by yt-dlp & FFmpeg.</p>
+      </div>
+      <div class="api-docs-body" id="apiDocsBody" style="display: none;">
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="http-badge get">GET</span>
+            <code class="endpoint-path">/api/formats?url={youtube_url}</code>
+          </div>
+          <p class="endpoint-desc">Extracts video metadata (title, thumbnail, duration) and lists available resolutions (4K, 1440p, 1080p, 720p, etc.) with pre-configured download URLs.</p>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="http-badge get">GET</span>
+            <code class="endpoint-path">/api/download?url={youtube_url}&format_id={format_id}</code>
+          </div>
+          <p class="endpoint-desc">Downloads media. For merged video+audio formats, executes FFmpeg to combine video with best audio, saves into <code>downloads/</code>, and triggers direct download.</p>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="http-badge get">GET</span>
+            <code class="endpoint-path">/api/status</code>
+          </div>
+          <p class="endpoint-desc">Returns health status, yt-dlp version, PHP version, and FFmpeg availability.</p>
+        </div>
+
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="http-badge get">GET</span>
+            <code class="endpoint-path">/downloads/{filename}</code>
+          </div>
+          <p class="endpoint-desc">Streams processed files with <code>Content-Disposition: attachment</code> for immediate browser file saving.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Media Preview Modal -->
+  <div class="modal-backdrop" id="previewModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h4 class="modal-title" id="previewModalTitle">Media Stream Preview</h4>
+        <button class="modal-close-btn" id="btnClosePreviewModal" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="media-container" id="mediaContainer">
+          <!-- Video or Audio tag injected dynamically -->
+        </div>
+        <p class="modal-note" id="previewModalNote">Direct YouTube streams can be played live or downloaded.</p>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn-modal-action primary" id="btnModalDirectDownload" target="_blank" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download Now</span>
+        </a>
+        <button class="btn-modal-action secondary" id="btnCloseModalBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p>PulseTube Backend UI &bull; Running on PHP <span id="footerPhpVer">8.2</span> with yt-dlp <span id="footerYtDlpVer">2026.03.13</span></p>
+      <p class="footer-sub">For personal and educational use.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

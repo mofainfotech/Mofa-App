@@ -6,8 +6,15 @@ header("Access-Control-Allow-Headers: Content-Type");
 header("Connection: close");
 header("Content-Type: application/json");
 
-$ytdlp = 'C:\\Users\\Administrator\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\Scripts\\yt-dlp.exe';
-$ffmpeg = 'C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe';
+$isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+if ($isWindows) {
+    $ytdlp = 'C:\\Users\\Administrator\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\Scripts\\yt-dlp.exe';
+    $ffmpeg = 'C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe';
+} else {
+    $ytdlp = 'yt-dlp';
+    $ffmpeg = 'ffmpeg';
+}
+
 $downloadsDir = __DIR__ . '/downloads';
 
 if (!is_dir($downloadsDir)) {

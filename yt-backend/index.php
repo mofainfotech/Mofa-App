@@ -130,6 +130,120 @@ if ($path === '/api/cookies') {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// /api/merge  – phone sends direct googlevideo.com video+audio URLs, backend merges to mp4
+// /api/audio-cdn – phone sends direct audio CDN URL, backend converts to mp3
+// No YouTube bot check: these are just direct CDN downloads + ffmpeg
+// ─────────────────────────────────────────────────────────────────────────────
+
+if ($path === '/api/merge') {
+    @set_time_limit(600);
+    $videoUrl = $_GET['video_url'] ?? '';
+    $audioUrl = $_GET['audio_url'] ?? '';
+    $title    = $_GET['title'] ?? 'YouTube_Video';
+
+    if (empty($videoUrl)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'video_url is required.']);
+        exit;
+    }
+
+    $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
+    $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Video';
+    $safeHash   = md5($videoUrl . $audioUrl);
+    $localFile  = $downloadsDir . DIRECTORY_SEPARATOR . "merge_{$safeHash}.mp4";
+
+    if (!file_exists($localFile) || filesize($localFile) === 0) {
+        $tmpVideo = $downloadsDir . DIRECTORY_SEPARATOR . "tmp_v_{$safeHash}.mp4";
+        $tmpAudio = $downloadsDir . DIRECTORY_SEPARATOR . "tmp_a_{$safeHash}.m4a";
+
+        // Download video and audio streams directly from CDN (no bot check)
+        shell_exec("curl -sL " . escapeshellarg($videoUrl) . " -o " . escapeshellarg($tmpVideo));
+        if (!empty($audioUrl)) {
+            shell_exec("curl -sL " . escapeshellarg($audioUrl) . " -o " . escapeshellarg($tmpAudio));
+        }
+
+        if (file_exists($tmpVideo) && filesize($tmpVideo) > 0) {
+            if (!empty($audioUrl) && file_exists($tmpAudio) && filesize($tmpAudio) > 0) {
+                // Merge video + audio
+                $mergeCmd = "ffmpeg -y -i " . escapeshellarg($tmpVideo) . " -i " . escapeshellarg($tmpAudio)
+                    . " -c:v copy -c:a aac -strict experimental " . escapeshellarg($localFile) . " 2>&1";
+                shell_exec($mergeCmd);
+            } else {
+                // Audio-less video, just copy
+                rename($tmpVideo, $localFile);
+            }
+        }
+
+        // Clean up temp files
+        @unlink($tmpVideo);
+        @unlink($tmpAudio);
+    }
+
+    if (!file_exists($localFile) || filesize($localFile) === 0) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to merge streams.']);
+        exit;
+    }
+
+    $outputName = "{$cleanTitle}.mp4";
+    while (ob_get_level()) { ob_end_clean(); }
+    header("Content-Description: File Transfer");
+    header("Content-Type: video/mp4");
+    header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
+    header("Content-Transfer-Encoding: binary");
+    header("Content-Length: " . filesize($localFile));
+    header("Cache-Control: no-cache");
+    readfile($localFile);
+    exit;
+}
+
+if ($path === '/api/audio-cdn') {
+    @set_time_limit(600);
+    $audioUrl = $_GET['audio_url'] ?? '';
+    $title    = $_GET['title'] ?? 'YouTube_Audio';
+
+    if (empty($audioUrl)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'audio_url is required.']);
+        exit;
+    }
+
+    $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
+    $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Audio';
+    $safeHash   = md5($audioUrl);
+    $localFile  = $downloadsDir . DIRECTORY_SEPARATOR . "audio_{$safeHash}.mp3";
+
+    if (!file_exists($localFile) || filesize($localFile) === 0) {
+        $tmpAudio = $downloadsDir . DIRECTORY_SEPARATOR . "tmp_raw_{$safeHash}.m4a";
+        shell_exec("curl -sL " . escapeshellarg($audioUrl) . " -o " . escapeshellarg($tmpAudio));
+
+        if (file_exists($tmpAudio) && filesize($tmpAudio) > 0) {
+            $convertCmd = "ffmpeg -y -i " . escapeshellarg($tmpAudio) . " -vn -ar 44100 -ac 2 -b:a 192k "
+                . escapeshellarg($localFile) . " 2>&1";
+            shell_exec($convertCmd);
+        }
+        @unlink($tmpAudio);
+    }
+
+    if (!file_exists($localFile) || filesize($localFile) === 0) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to convert audio.']);
+        exit;
+    }
+
+    $outputName = "{$cleanTitle}.mp3";
+    while (ob_get_level()) { ob_end_clean(); }
+    header("Content-Description: File Transfer");
+    header("Content-Type: audio/mpeg");
+    header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
+    header("Content-Transfer-Encoding: binary");
+    header("Content-Length: " . filesize($localFile));
+    header("Cache-Control: no-cache");
+    readfile($localFile);
+    exit;
+}
+
 if ($path === '/api/formats') {
     $rawInput = json_decode(file_get_contents('php://input'), true);
     $url = $_GET['url'] ?? $_POST['url'] ?? ($rawInput['url'] ?? '');

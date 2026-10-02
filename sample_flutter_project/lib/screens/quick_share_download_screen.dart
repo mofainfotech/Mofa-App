@@ -1,10 +1,27 @@
-import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import '../config/app_config.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../services/background_download_task.dart';
 import '../services/notification_service.dart';
+import '../config/app_config.dart';
+
+// Internal model to hold a format option shown in the UI
+class _FormatOption {
+  final String label;
+  final String downloadUrl; // either a direct CDN URL or backend /api/download URL
+  final bool isAudio;
+  final int? filesize;
+  final int qualityHeight; // 0 for audio
+
+  const _FormatOption({
+    required this.label,
+    required this.downloadUrl,
+    required this.isAudio,
+    this.filesize,
+    this.qualityHeight = 0,
+  });
+}
 
 class QuickShareDownloadScreen extends StatefulWidget {
   final String videoUrl;
@@ -18,7 +35,12 @@ class QuickShareDownloadScreen extends StatefulWidget {
 class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
   bool _isLoading = true;
   String? _errorMessage;
-  Map<String, dynamic>? _videoData;
+
+  String? _videoTitle;
+  String? _thumbnail;
+  List<_FormatOption> _formats = [];
+
+  final _yt = YoutubeExplode();
 
   @override
   void initState() {
@@ -27,51 +49,125 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
     _fetchFormats();
   }
 
+  @override
+  void dispose() {
+    _yt.close();
+    super.dispose();
+  }
+
   Future<void> _fetchFormats() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _formats = [];
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.backendUrl}/api/formats?url=${Uri.encodeComponent(widget.videoUrl)}'),
-      ).timeout(const Duration(seconds: 30));
+      final videoId = VideoId(widget.videoUrl);
+      final video = await _yt.videos.get(videoId);
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+
+      _videoTitle = video.title;
+      _thumbnail = video.thumbnails.highResUrl;
+
+      final options = <_FormatOption>[];
+      final seenHeights = <int>{};
+
+      // --- Muxed streams (video + audio already combined, ≤1080p) ---
+      for (final s in manifest.muxed.sortedByVideoQuality()) {
+        final h = s.videoResolution.height.toInt();
+        if (!seenHeights.contains(h) && [144, 240, 360, 480, 720].contains(h)) {
+          seenHeights.add(h);
+          options.add(_FormatOption(
+            label: '${h}p Video+Audio (mp4)',
+            downloadUrl: s.url.toString(),
+            isAudio: false,
+            filesize: s.size.totalBytes.toInt(),
+            qualityHeight: h,
+          ));
+        }
+      }
+
+      // --- Adaptive video streams (1080p, 1440p, 2160p) combined with best audio via backend ---
+      for (final s in manifest.videoOnly.sortedByVideoQuality()) {
+        final h = s.videoResolution.height.toInt();
+        if (!seenHeights.contains(h) && [1080, 1440, 2160].contains(h)) {
+          seenHeights.add(h);
+          // Best audio stream to merge
+          final bestAudio = manifest.audioOnly
+              .where((a) => a.audioCodec.contains('mp4a') || a.audioCodec.contains('aac'))
+              .fold<AudioOnlyStreamInfo?>(null, (best, a) =>
+                best == null || a.bitrate.bitsPerSecond > best.bitrate.bitsPerSecond ? a : best);
+
+          final videoUrl = Uri.encodeComponent(s.url.toString());
+          final audioUrl = Uri.encodeComponent(bestAudio?.url.toString() ?? '');
+          final titleEnc = Uri.encodeComponent(video.title);
+
+          // Backend will merge video+audio CDN streams using ffmpeg (no YouTube bot check on CDN)
+          final backendUrl =
+              '${AppConfig.backendUrl}/api/merge?video_url=$videoUrl&audio_url=$audioUrl&title=$titleEnc';
+
+          options.add(_FormatOption(
+            label: '${h}p Video+Audio (mp4)',
+            downloadUrl: backendUrl,
+            isAudio: false,
+            filesize: s.size.totalBytes.toInt(),
+            qualityHeight: h,
+          ));
+        }
+      }
+
+      // Sort video by quality descending
+      options.sort((a, b) => b.qualityHeight - a.qualityHeight);
+
+      // --- Best audio-only → ask backend to convert to MP3 ---
+      final bestAudio = manifest.audioOnly
+          .where((a) => a.audioCodec.contains('mp4a') || a.audioCodec.contains('aac'))
+          .fold<AudioOnlyStreamInfo?>(null, (best, a) =>
+            best == null || a.bitrate.bitsPerSecond > best.bitrate.bitsPerSecond ? a : best);
+
+      if (bestAudio != null) {
+        final audioUrl = Uri.encodeComponent(bestAudio.url.toString());
+        final titleEnc = Uri.encodeComponent(video.title);
+        final backendUrl =
+            '${AppConfig.backendUrl}/api/audio-cdn?audio_url=$audioUrl&title=$titleEnc';
+        options.add(_FormatOption(
+          label: 'High Quality MP3 Audio (${bestAudio.bitrate.kiloBitsPerSecond.round()} kbps)',
+          downloadUrl: backendUrl,
+          isAudio: true,
+          filesize: bestAudio.size.totalBytes.toInt(),
+          qualityHeight: 0,
+        ));
+      }
 
       if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _videoData = data;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Could not load formats (${response.statusCode})';
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _formats = options;
+        _isLoading = false;
+      });
+    } on VideoUnplayableException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Video is unavailable: ${e.message}';
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Connection failed: $e';
+        _errorMessage = 'Could not fetch video info:\n$e';
         _isLoading = false;
       });
     }
   }
 
-  void _download(String downloadUrl, String label, bool isAudio) {
-    // 1. Start actual background download immediately
+  void _download(_FormatOption fmt) {
     BackgroundDownloadTask.startDownload(
-      downloadUrl: downloadUrl,
-      videoTitle: _videoData?['title'] ?? 'YouTube Media',
-      isAudio: isAudio,
-      formatLabel: label,
-      thumbnail: _videoData?['thumbnail'],
+      downloadUrl: fmt.downloadUrl,
+      videoTitle: _videoTitle ?? 'YouTube Media',
+      isAudio: fmt.isAudio,
+      formatLabel: fmt.label,
+      thumbnail: _thumbnail,
     );
-
-    // 2. Hand off to background and close popup overlay quickly, showing toast
     _closeAndExit(toastMessage: 'Download started');
   }
 
@@ -83,7 +179,6 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
       SystemNavigator.pop();
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -185,24 +280,25 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
                             ],
                           ),
                         ),
-                      ] else if (_videoData != null) ...[
+                      ] else if (_formats.isNotEmpty) ...[
                         // Video title & thumbnail preview
                         Row(
                           children: [
-                            if (_videoData!['thumbnail'] != null)
+                            if (_thumbnail != null)
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
-                                  _videoData!['thumbnail'],
+                                  _thumbnail!,
                                   width: 72,
                                   height: 46,
                                   fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                                 ),
                               ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                _videoData!['title'] ?? 'YouTube Media',
+                                _videoTitle ?? 'YouTube Media',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -232,20 +328,15 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
                           ),
                           child: ListView.builder(
                             shrinkWrap: true,
-                            itemCount: (_videoData!['formats'] as List? ?? []).length,
+                            itemCount: _formats.length,
                             itemBuilder: (context, index) {
-                              final fmt = (_videoData!['formats'] as List)[index];
-                              final label = fmt['label'] ?? 'Format';
-                              final downloadUrl = fmt['download_url'] ?? '';
-                              final isAudio = fmt['type'] == 'audio';
-                              final filesize = fmt['filesize'];
-
+                              final fmt = _formats[index];
                               String? sizeString;
-                              if (filesize != null && filesize is num && filesize > 0) {
-                                final mb = filesize / (1024 * 1024);
+                              if (fmt.filesize != null && fmt.filesize! > 0) {
+                                final mb = fmt.filesize! / (1024 * 1024);
                                 sizeString = mb >= 1
                                     ? '${mb.toStringAsFixed(1)} MB'
-                                    : '${(filesize / 1024).toStringAsFixed(0)} KB';
+                                    : '${(fmt.filesize! / 1024).toStringAsFixed(0)} KB';
                               }
 
                               return Card(
@@ -261,12 +352,12 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
                                     vertical: 2,
                                   ),
                                   leading: Icon(
-                                    isAudio ? Icons.music_note : Icons.movie,
-                                    color: isAudio ? Colors.greenAccent : Colors.redAccent,
+                                    fmt.isAudio ? Icons.music_note : Icons.movie,
+                                    color: fmt.isAudio ? Colors.greenAccent : Colors.redAccent,
                                     size: 18,
                                   ),
                                   title: Text(
-                                    label,
+                                    fmt.label,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -296,9 +387,7 @@ class _QuickShareDownloadScreenState extends State<QuickShareDownloadScreen> {
                                       ),
                                       minimumSize: const Size(56, 30),
                                     ),
-                                    onPressed: downloadUrl.isNotEmpty
-                                        ? () => _download(downloadUrl, label, isAudio)
-                                        : null,
+                                    onPressed: () => _download(fmt),
                                     child: const Text('Download', style: TextStyle(fontSize: 11)),
                                   ),
                                 ),

@@ -147,8 +147,9 @@ if ($path === '/api/formats') {
 
     $cookieParam = getCookieParam($cookieFile);
     $safeUrl = escapeshellarg($url);
-    $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
+    $cmd = escapeshellarg($ytdlp) . " $cookieParam -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
+
 
 
 
@@ -301,10 +302,11 @@ if ($path === '/api/prepare') {
     $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
 
         $cmdOutput = executeCliCommand($cmd);
@@ -406,10 +408,11 @@ if ($path === '/api/download') {
     $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android_creator,android,ios\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
 
         $cmdOutput = executeCliCommand($cmd);

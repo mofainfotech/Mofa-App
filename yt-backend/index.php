@@ -18,7 +18,7 @@ if ($isWindows) {
 }
 
 $downloadsDir = __DIR__ . '/downloads';
-$cookieFile   = __DIR__ . '/cookies.txt';
+$cookieFile = __DIR__ . '/cookies.txt';
 
 // Check if cookies provided via Environment Variable
 $envCookies = getenv('YOUTUBE_COOKIES');
@@ -26,7 +26,8 @@ if (!empty($envCookies) && (!file_exists($cookieFile) || filesize($cookieFile) <
     @file_put_contents($cookieFile, $envCookies);
 }
 
-function getCookieParam($cookieFile) {
+function getCookieParam($cookieFile)
+{
     if (file_exists($cookieFile) && filesize($cookieFile) > 10) {
         return "--cookies " . escapeshellarg($cookieFile);
     }
@@ -38,13 +39,16 @@ if (!is_dir($downloadsDir)) {
 }
 
 
-function executeCliCommand($cmd) {
+function executeCliCommand($cmd)
+{
     return shell_exec($cmd);
 }
 
-function getYtDlpVersion($ytdlp, $nullDev = 'NUL') {
+function getYtDlpVersion($ytdlp, $nullDev = 'NUL')
+{
     static $cachedVersion = null;
-    if ($cachedVersion !== null) return $cachedVersion;
+    if ($cachedVersion !== null)
+        return $cachedVersion;
     $verFile = sys_get_temp_dir() . '/ytdlp_version.cache';
     if (file_exists($verFile) && (time() - filemtime($verFile) < 3600)) {
         $cachedVersion = trim(file_get_contents($verFile));
@@ -67,7 +71,8 @@ if (empty($path)) {
     }
 }
 $path = '/' . trim($path, '/');
-if ($path === '//') $path = '/';
+if ($path === '//')
+    $path = '/';
 
 
 // Serve HTML app if requested via browser at root
@@ -81,9 +86,9 @@ if ($path === '/' || $path === '') {
 
     $version = getYtDlpVersion($ytdlp);
     echo json_encode([
-        'api'    => 'Fast YouTube Downloader Backend (Core PHP)',
+        'api' => 'Fast YouTube Downloader Backend (Core PHP)',
         'yt_dlp' => $version ?: 'not found',
-        'php'    => PHP_VERSION,
+        'php' => PHP_VERSION,
         'status' => 'online',
     ]);
     exit;
@@ -93,11 +98,11 @@ if ($path === '/api/status') {
     $version = getYtDlpVersion($ytdlp, $nullDev);
     $ffmpegOk = $isWindows ? file_exists($ffmpeg) : (!empty(trim(shell_exec("which $ffmpeg 2>/dev/null") ?? '')));
     echo json_encode([
-        'api'      => 'Fast YouTube Downloader Backend (Core PHP)',
-        'yt_dlp'   => $version ?: 'not found',
-        'php'      => PHP_VERSION,
-        'ffmpeg'   => $ffmpegOk ? 'installed' : 'missing',
-        'status'   => 'online',
+        'api' => 'Fast YouTube Downloader Backend (Core PHP)',
+        'yt_dlp' => $version ?: 'not found',
+        'php' => PHP_VERSION,
+        'ffmpeg' => $ffmpegOk ? 'installed' : 'missing',
+        'status' => 'online',
     ]);
     exit;
 }
@@ -122,9 +127,9 @@ if ($path === '/api/cookies') {
     } else {
         $hasCookies = file_exists($cookieFile) && filesize($cookieFile) > 10;
         echo json_encode([
-            'success'     => true,
+            'success' => true,
             'has_cookies' => $hasCookies,
-            'size'        => $hasCookies ? filesize($cookieFile) : 0,
+            'size' => $hasCookies ? filesize($cookieFile) : 0,
         ]);
         exit;
     }
@@ -140,7 +145,7 @@ if ($path === '/api/merge') {
     @set_time_limit(600);
     $videoUrl = $_GET['video_url'] ?? '';
     $audioUrl = $_GET['audio_url'] ?? '';
-    $title    = $_GET['title'] ?? 'YouTube_Video';
+    $title = $_GET['title'] ?? 'YouTube_Video';
 
     if (empty($videoUrl)) {
         http_response_code(400);
@@ -150,8 +155,8 @@ if ($path === '/api/merge') {
 
     $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
     $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Video';
-    $safeHash   = md5($videoUrl . $audioUrl);
-    $localFile  = $downloadsDir . DIRECTORY_SEPARATOR . "merge_{$safeHash}.mp4";
+    $safeHash = md5($videoUrl . $audioUrl);
+    $localFile = $downloadsDir . DIRECTORY_SEPARATOR . "merge_{$safeHash}.mp4";
 
     if (!file_exists($localFile) || filesize($localFile) === 0) {
         $tmpVideo = $downloadsDir . DIRECTORY_SEPARATOR . "tmp_v_{$safeHash}.mp4";
@@ -187,7 +192,9 @@ if ($path === '/api/merge') {
     }
 
     $outputName = "{$cleanTitle}.mp4";
-    while (ob_get_level()) { ob_end_clean(); }
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     header("Content-Description: File Transfer");
     header("Content-Type: video/mp4");
     header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
@@ -201,7 +208,7 @@ if ($path === '/api/merge') {
 if ($path === '/api/audio-cdn') {
     @set_time_limit(600);
     $audioUrl = $_GET['audio_url'] ?? '';
-    $title    = $_GET['title'] ?? 'YouTube_Audio';
+    $title = $_GET['title'] ?? 'YouTube_Audio';
 
     if (empty($audioUrl)) {
         http_response_code(400);
@@ -211,8 +218,8 @@ if ($path === '/api/audio-cdn') {
 
     $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
     $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Audio';
-    $safeHash   = md5($audioUrl);
-    $localFile  = $downloadsDir . DIRECTORY_SEPARATOR . "audio_{$safeHash}.mp3";
+    $safeHash = md5($audioUrl);
+    $localFile = $downloadsDir . DIRECTORY_SEPARATOR . "audio_{$safeHash}.mp3";
 
     if (!file_exists($localFile) || filesize($localFile) === 0) {
         $tmpAudio = $downloadsDir . DIRECTORY_SEPARATOR . "tmp_raw_{$safeHash}.m4a";
@@ -233,7 +240,9 @@ if ($path === '/api/audio-cdn') {
     }
 
     $outputName = "{$cleanTitle}.mp3";
-    while (ob_get_level()) { ob_end_clean(); }
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     header("Content-Description: File Transfer");
     header("Content-Type: audio/mpeg");
     header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
@@ -276,8 +285,8 @@ if ($path === '/api/formats') {
         http_response_code(500);
         echo json_encode([
             'success' => false,
-            'error'   => 'Could not parse video details.',
-            'cmd'     => $cmd,
+            'error' => 'Could not parse video details.',
+            'cmd' => $cmd,
             'details' => substr($output ?? 'No output', 0, 500)
         ]);
         exit;
@@ -296,25 +305,25 @@ if ($path === '/api/formats') {
         $vcodec = $f['vcodec'] ?? 'none';
         $acodec = $f['acodec'] ?? 'none';
         $height = $f['height'] ?? null;
-        $abr    = $f['abr'] ?? 0;
-        $tbr    = $f['tbr'] ?? 0;
-        $vbr    = $f['vbr'] ?? 0;
-        $ext    = $f['ext'] ?? 'mp4';
-        $fid    = $f['format_id'];
+        $abr = $f['abr'] ?? 0;
+        $tbr = $f['tbr'] ?? 0;
+        $vbr = $f['vbr'] ?? 0;
+        $ext = $f['ext'] ?? 'mp4';
+        $fid = $f['format_id'];
 
         $filesize = $f['filesize'] ?? $f['filesize_approx'] ?? null;
         if (!$filesize && $duration > 0) {
             $effectiveBitrate = $tbr ?: ($vbr + ($abr ?: 128));
             if ($effectiveBitrate > 0) {
                 // effectiveBitrate is in kbps, duration in seconds -> bytes
-                $filesize = (int)round(($effectiveBitrate * 1000 / 8) * $duration);
+                $filesize = (int) round(($effectiveBitrate * 1000 / 8) * $duration);
             }
         }
 
         if ($vcodec !== 'none' && $height && in_array($height, $allowedHeights)) {
             $hasAudio = ($acodec !== 'none');
-            $ext = $ext === 'webm' ? 'mp4' : $ext; 
-            
+            $ext = $ext === 'webm' ? 'mp4' : $ext;
+
             $formatIdToSend = $fid;
             if (!$hasAudio) {
                 $formatIdToSend .= '+bestaudio';
@@ -325,30 +334,29 @@ if ($path === '/api/formats') {
                 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
                 $host = $_SERVER['HTTP_HOST'];
                 $baseUrl = "$protocol://$host" . str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']);
-                
+
                 $formatsMap[$height] = [
-                    'label'        => "{$height}p Video+Audio ($ext)",
-                    'type'         => 'video',
-                    'height'       => $height,
-                    'ext'          => $ext,
-                    'filesize'     => $filesize,
+                    'label' => "{$height}p Video+Audio ($ext)",
+                    'type' => 'video',
+                    'height' => $height,
+                    'ext' => $ext,
+                    'filesize' => $filesize,
                     'download_url' => $baseUrl . "/api/download?url=" . urlencode($url) . "&format_id=" . urlencode($formatIdToSend) . "&title=" . urlencode($videoTitle),
                 ];
             }
-        }
-        elseif ($vcodec === 'none' && $acodec !== 'none') {
+        } elseif ($vcodec === 'none' && $acodec !== 'none') {
             if (!$bestAudio || $abr > $bestAudio['abr']) {
                 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
                 $host = $_SERVER['HTTP_HOST'];
                 $baseUrl = "$protocol://$host" . str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']);
 
                 $bestAudio = [
-                    'label'        => "High Quality MP3 Audio (" . round($abr) . "kbps)",
-                    'type'         => 'audio',
-                    'height'       => 0,
-                    'abr'          => $abr,
-                    'ext'          => 'mp3', 
-                    'filesize'     => $filesize,
+                    'label' => "High Quality MP3 Audio (" . round($abr) . "kbps)",
+                    'type' => 'audio',
+                    'height' => 0,
+                    'abr' => $abr,
+                    'ext' => 'mp3',
+                    'filesize' => $filesize,
                     'download_url' => $baseUrl . "/api/download?url=" . urlencode($url) . "&format_id=" . urlencode($fid) . "&type=audio&ext=mp3&title=" . urlencode($videoTitle),
                 ];
             }
@@ -369,11 +377,11 @@ if ($path === '/api/formats') {
     }
 
     echo json_encode([
-        'success'   => true,
-        'title'     => $videoTitle,
+        'success' => true,
+        'title' => $videoTitle,
         'thumbnail' => $info['thumbnail'] ?? '',
-        'duration'  => $info['duration'] ?? 0,
-        'formats'   => $formats,
+        'duration' => $info['duration'] ?? 0,
+        'formats' => $formats,
     ]);
     exit;
 }
@@ -381,9 +389,9 @@ if ($path === '/api/formats') {
 if ($path === '/api/prepare') {
     @set_time_limit(600);
     $rawInput = json_decode(file_get_contents('php://input'), true);
-    $url      = $_GET['url'] ?? $_POST['url'] ?? ($rawInput['url'] ?? '');
+    $url = $_GET['url'] ?? $_POST['url'] ?? ($rawInput['url'] ?? '');
     $formatId = $_GET['format_id'] ?? $_POST['format_id'] ?? ($rawInput['format_id'] ?? '');
-    $title    = $_GET['title'] ?? $_POST['title'] ?? ($rawInput['title'] ?? 'YouTube_Media');
+    $title = $_GET['title'] ?? $_POST['title'] ?? ($rawInput['title'] ?? 'YouTube_Media');
 
     if (empty($url) || empty($formatId)) {
         http_response_code(400);
@@ -391,16 +399,17 @@ if ($path === '/api/prepare') {
         exit;
     }
 
-    $isAudio = (isset($_GET['type']) && $_GET['type'] === 'audio') || 
-               (isset($_GET['ext']) && $_GET['ext'] === 'mp3') || 
-               in_array($formatId, ['140', '251', '139', '249', 'ba', 'bestaudio']);
-               
+    $isAudio = (isset($_GET['type']) && $_GET['type'] === 'audio') ||
+        (isset($_GET['ext']) && $_GET['ext'] === 'mp3') ||
+        in_array($formatId, ['140', '251', '139', '249', 'ba', 'bestaudio']);
+
     $ext = $isAudio ? 'mp3' : 'mp4';
 
     // Clean title for safe filesystem & download filename
     $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
     $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle));
-    if (empty($cleanTitle)) $cleanTitle = 'YouTube_Media';
+    if (empty($cleanTitle))
+        $cleanTitle = 'YouTube_Media';
 
     // Strip playlist parameters so yt-dlp only downloads single video
     $cleanUrl = preg_replace('/&list=[^&]+/', '', $url);
@@ -432,9 +441,9 @@ if ($path === '/api/prepare') {
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         http_response_code(500);
         echo json_encode([
-            'success' => false, 
-            'error'   => 'Failed to process media file with yt-dlp/ffmpeg.',
-            'cmd'     => $cmd ?? '',
+            'success' => false,
+            'error' => 'Failed to process media file with yt-dlp/ffmpeg.',
+            'cmd' => $cmd ?? '',
             'details' => $cmdOutput ?: 'No output from command'
         ]);
         exit;
@@ -446,10 +455,10 @@ if ($path === '/api/prepare') {
     $readyUrl = $baseUrl . "/api/download?file=" . urlencode($localFileName) . "&title=" . urlencode($cleanTitle) . "&ext=" . $ext;
 
     echo json_encode([
-        'success'      => true,
-        'ready'        => true,
-        'file_name'    => "{$cleanTitle}.{$ext}",
-        'size_bytes'   => filesize($absolutePath),
+        'success' => true,
+        'ready' => true,
+        'file_name' => "{$cleanTitle}.{$ext}",
+        'size_bytes' => filesize($absolutePath),
         'download_url' => $readyUrl
     ]);
     exit;
@@ -469,7 +478,9 @@ if ($path === '/api/download') {
             $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Media';
             $outputName = "{$cleanTitle}.{$ext}";
 
-            while (ob_get_level()) { ob_end_clean(); }
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             header("Content-Description: File Transfer");
             header("Content-Type: application/octet-stream");
             header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
@@ -483,9 +494,9 @@ if ($path === '/api/download') {
         }
     }
 
-    $url      = $_GET['url'] ?? '';
+    $url = $_GET['url'] ?? '';
     $formatId = $_GET['format_id'] ?? '';
-    $title    = $_GET['title'] ?? 'YouTube_Media';
+    $title = $_GET['title'] ?? 'YouTube_Media';
     $isStream = isset($_GET['stream']) && $_GET['stream'] === '1';
 
     if (empty($url) || empty($formatId)) {
@@ -494,16 +505,17 @@ if ($path === '/api/download') {
         exit;
     }
 
-    $isAudio = (isset($_GET['type']) && $_GET['type'] === 'audio') || 
-               (isset($_GET['ext']) && $_GET['ext'] === 'mp3') || 
-               in_array($formatId, ['140', '251', '139', '249', 'ba', 'bestaudio']);
-               
+    $isAudio = (isset($_GET['type']) && $_GET['type'] === 'audio') ||
+        (isset($_GET['ext']) && $_GET['ext'] === 'mp3') ||
+        in_array($formatId, ['140', '251', '139', '249', 'ba', 'bestaudio']);
+
     $ext = $isAudio ? 'mp3' : 'mp4';
 
     // Clean title for safe filesystem & download filename
     $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
     $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle));
-    if (empty($cleanTitle)) $cleanTitle = 'YouTube_Media';
+    if (empty($cleanTitle))
+        $cleanTitle = 'YouTube_Media';
     $downloadOutputName = "{$cleanTitle}.{$ext}";
 
     // Strip playlist parameters
@@ -536,15 +548,17 @@ if ($path === '/api/download') {
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         http_response_code(500);
         echo json_encode([
-            'success' => false, 
-            'error'   => 'Failed to process and save media file.',
-            'cmd'     => $cmd ?? '',
+            'success' => false,
+            'error' => 'Failed to process and save media file.',
+            'cmd' => $cmd ?? '',
             'details' => $cmdOutput ?: 'No output from command'
         ]);
         exit;
     }
 
-    while (ob_get_level()) { ob_end_clean(); }
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
 
     if ($isStream) {
         $mime = $isAudio ? "audio/mpeg" : "video/mp4";

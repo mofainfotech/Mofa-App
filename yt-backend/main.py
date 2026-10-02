@@ -345,6 +345,55 @@ async def update_cookies(
     }
 
 
+@app.get("/api/diag_test")
+async def diag_test():
+    url = "https://youtu.be/cV2RFv9EsbI"
+    tests = {
+        "A_visionos_cookies": {"player_client": ["visionos"], "use_cookies": True},
+        "B_web_embedded_cookies": {"player_client": ["web_embedded"], "use_cookies": True},
+        "C_default_web_embedded_cookies": {"player_client": ["default", "web_embedded"], "use_cookies": True},
+        "D_default_cookies": {"player_client": None, "use_cookies": True},
+        "E_no_cookies": {"player_client": None, "use_cookies": False},
+        "F_tv_downgraded_cookies": {"player_client": ["tv_downgraded"], "use_cookies": True},
+        "G_tv_downgraded_no_cookies": {"player_client": ["tv_downgraded"], "use_cookies": False},
+        "H_web_embedded_no_cookies": {"player_client": ["web_embedded"], "use_cookies": False},
+    }
+    results = {}
+    js_runtime_cfg = {"node": {"path": NODE_PATH}} if NODE_PATH else {"node": {}}
+
+    for name, cfg in tests.items():
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "socket_timeout": 15,
+            "noplaylist": True,
+            "js_runtimes": js_runtime_cfg,
+        }
+        if cfg["player_client"]:
+            opts["extractor_args"] = {"youtube": {"player_client": cfg["player_client"]}}
+        if cfg["use_cookies"] and get_cookie_file():
+            opts["cookiefile"] = get_cookie_file()
+
+        try:
+            def run_test(o=opts):
+                with yt_dlp.YoutubeDL(o) as ydl:
+                    return ydl.extract_info(url, download=False)
+            info = await asyncio.to_thread(run_test)
+            formats_count = len(info.get("formats", []))
+            results[name] = {"success": True, "formats": formats_count}
+        except Exception as e:
+            results[name] = {"success": False, "error": str(e).split("\n")[0]}
+
+    return {
+        "node": NODE_VERSION,
+        "ejs": EJS_VERSION,
+        "cookie_file": bool(get_cookie_file()),
+        "cookie_size": os.path.getsize(get_cookie_file()) if get_cookie_file() else 0,
+        "results": results
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Format Extraction
 # ─────────────────────────────────────────────────────────────────────────────

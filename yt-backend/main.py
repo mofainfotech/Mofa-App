@@ -252,8 +252,9 @@ def build_ydl_opts(cookie_file: Optional[str] = None, client_fallback: Optional[
         "extract_flat": False,
         "socket_timeout": 30,
         "noplaylist": True,
+        "js_runtimes": {"node": {}},
     }
-    if cookie_file:
+    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
         opts["cookiefile"] = cookie_file
     if FFMPEG_PATH:
         opts["ffmpeg_location"] = FFMPEG_PATH
@@ -289,20 +290,25 @@ async def api_formats(
     url = clean_youtube_url(url.strip())
     cookie_file = get_cookie_file()
 
-    # Try extraction with standard and fallback clients
+    # Try extraction with standard and fallback clients, both with and without cookies
     strategies = [
-        None,  # Standard yt-dlp default
-        ["web_embedded", "tv_embedded"],  # Embedded bypass
-        ["android", "web"],  # Mobile client bypass
-        ["ios"],  # iOS client bypass
+        (True, None),                # Default player with cookies
+        (True, ["android"]),         # Android client with cookies
+        (True, ["web_embedded"]),    # Web embedded with cookies
+        (True, ["ios"]),             # iOS with cookies
+        (False, ["android"]),        # Android WITHOUT cookies (bypasses stale cookie rejection)
+        (False, ["web_embedded"]),   # Web embedded WITHOUT cookies
+        (False, ["ios"]),            # iOS WITHOUT cookies
+        (False, None),               # Default WITHOUT cookies
     ]
 
     info = None
     last_error = None
 
-    for client_list in strategies:
+    for use_cookies, client_list in strategies:
         try:
-            opts = build_ydl_opts(cookie_file=cookie_file, client_fallback=client_list)
+            cf = cookie_file if use_cookies else None
+            opts = build_ydl_opts(cookie_file=cf, client_fallback=client_list)
             def extract():
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return ydl.extract_info(url, download=False)

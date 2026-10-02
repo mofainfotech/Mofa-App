@@ -147,7 +147,8 @@ if ($path === '/api/formats') {
 
     $cookieParam = getCookieParam($cookieFile);
     $safeUrl = escapeshellarg($url);
-    $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=android,web\" --user-agent \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
+    // Use iOS player client: YouTube does not present the web bot check to the iOS client
+    $cmd = escapeshellarg($ytdlp) . " --extractor-args \"youtube:player_client=ios\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
 
 
@@ -303,12 +304,12 @@ if ($path === '/api/prepare') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
-    $extraArgs = "--extractor-args \"youtube:player_client=android,web\" --user-agent \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36\"";
+    $extraArgs = "--extractor-args \"youtube:player_client=ios\"";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $extraArgs --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
 
         $cmdOutput = executeCliCommand($cmd);
@@ -319,6 +320,7 @@ if ($path === '/api/prepare') {
         echo json_encode([
             'success' => false, 
             'error'   => 'Failed to process media file with yt-dlp/ffmpeg.',
+            'cmd'     => $cmd ?? '',
             'details' => $cmdOutput ?: 'No output from command'
         ]);
         exit;
@@ -406,12 +408,12 @@ if ($path === '/api/download') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
-    $extraArgs = "--extractor-args \"youtube:player_client=android,web\" --user-agent \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36\"";
+    $extraArgs = "--extractor-args \"youtube:player_client=ios\"";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $extraArgs --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
 
         $cmdOutput = executeCliCommand($cmd);

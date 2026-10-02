@@ -147,9 +147,10 @@ if ($path === '/api/formats') {
 
     $cookieParam = getCookieParam($cookieFile);
     $safeUrl = escapeshellarg($url);
-    $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
-    $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=web,default\" --js-runtimes node -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
+    $userAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
+    $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=mweb,android;player_skip=webpage,configs\" --js-runtimes node -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
+
 
 
 
@@ -303,12 +304,13 @@ if ($path === '/api/prepare') {
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
-        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+        $userAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=mweb,android;player_skip=webpage,configs\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=mweb,android;player_skip=webpage,configs\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
 
 
@@ -411,12 +413,13 @@ if ($path === '/api/download') {
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
-        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+        $userAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
         if ($isAudio) {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=mweb,android;player_skip=webpage,configs\" --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         } else {
-            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam --user-agent " . escapeshellarg($userAgent) . " --extractor-args \"youtube:player_client=mweb,android;player_skip=webpage,configs\" --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
         }
+
 
 
 

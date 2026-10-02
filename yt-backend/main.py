@@ -195,7 +195,7 @@ def build_ydl_opts(
         "js_runtimes": js_runtime_cfg,
         "extractor_args": {
             "youtube": {
-                "player_client": ["default", "web_embedded"]
+                "player_client": ["web_embedded"]
             }
         },
     }

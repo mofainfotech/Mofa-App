@@ -162,6 +162,7 @@ if ($path === '/api/formats') {
         echo json_encode([
             'success' => false,
             'error'   => 'Could not parse video details.',
+            'cmd'     => $cmd,
             'details' => substr($output ?? 'No output', 0, 500)
         ]);
         exit;

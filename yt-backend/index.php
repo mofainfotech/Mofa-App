@@ -147,8 +147,8 @@ if ($path === '/api/formats') {
 
     $cookieParam = getCookieParam($cookieFile);
     $safeUrl = escapeshellarg($url);
-    // mweb client accepts browser cookies and is less aggressively bot-checked
-    $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=mweb,tv\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
+    // web_embedded uses YouTube's embedded player API - no PO token required on datacenter IPs
+    $cmd = escapeshellarg($ytdlp) . " $cookieParam --extractor-args \"youtube:player_client=web_embedded,tv_embedded\" -J --no-playlist --no-warnings --no-update --socket-timeout 25 $safeUrl 2>&1";
     $output = executeCliCommand($cmd);
 
 
@@ -304,7 +304,7 @@ if ($path === '/api/prepare') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
-    $extraArgs = "--extractor-args \"youtube:player_client=mweb,tv\"";
+    $extraArgs = "--extractor-args \"youtube:player_client=web_embedded,tv_embedded\"";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
             $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
@@ -408,7 +408,7 @@ if ($path === '/api/download') {
     // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
     $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
     $cookieParam = getCookieParam($cookieFile);
-    $extraArgs = "--extractor-args \"youtube:player_client=mweb,tv\"";
+    $extraArgs = "--extractor-args \"youtube:player_client=web_embedded,tv_embedded\"";
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         if ($isAudio) {
             $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";

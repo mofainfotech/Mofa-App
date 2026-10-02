@@ -11,7 +11,7 @@ import subprocess
 from urllib.parse import quote, unquote
 from typing import Optional
 
-from fastapi import FastAPI, Request, Query, Form, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, Query, Form, UploadFile, File, HTTPException, Header
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,21 +26,41 @@ COOKIE_FILE = os.path.join(BASE_DIR, "cookies.txt")
 
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
-# Check for cookies in environment variable
+# Cookie Handling (Environment variable takes precedence over existing local file)
 env_cookies = os.getenv("YOUTUBE_COOKIES")
-if env_cookies and (not os.path.exists(COOKIE_FILE) or os.path.getsize(COOKIE_FILE) < 10):
+if env_cookies and env_cookies.strip():
     try:
         with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-            f.write(env_cookies.strip())
+            f.write(env_cookies.strip() + "\n")
     except Exception as e:
         print(f"Warning: Could not write YOUTUBE_COOKIES to cookie file: {e}")
 
-# FFmpeg detection
+# Tool & runtime detection
 FFMPEG_PATH = shutil.which("ffmpeg")
 if not FFMPEG_PATH and os.name == "nt":
     win_ffmpeg = r"C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe"
     if os.path.exists(win_ffmpeg):
         FFMPEG_PATH = win_ffmpeg
+
+NODE_VERSION = None
+try:
+    node_out = subprocess.check_output(["node", "--version"], stderr=subprocess.DEVNULL).decode().strip()
+    NODE_VERSION = node_out
+except Exception:
+    NODE_VERSION = None
+
+# Startup Diagnostics (Safe: NEVER log cookie content or secrets)
+print("=" * 60)
+print("Starting PulseTube Python Backend...")
+print(f"  Python:          {platform.python_version()}")
+print(f"  yt-dlp:          {yt_dlp.version.__version__}")
+print(f"  FFmpeg:          {'installed (' + FFMPEG_PATH + ')' if FFMPEG_PATH else 'missing'}")
+print(f"  Node.js:         {NODE_VERSION if NODE_VERSION else 'missing'}")
+if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 10:
+    print(f"  YouTube cookies: available (Cookie file: {COOKIE_FILE}, size: {os.path.getsize(COOKIE_FILE)} bytes)")
+else:
+    print("  WARNING: YouTube cookies are not configured.")
+print("=" * 60)
 
 app = FastAPI(
     title="PulseTube Python YouTube Downloader Backend",
@@ -141,6 +161,61 @@ def cleanup_old_downloads(max_age_seconds: int = 7200, max_dir_size_mb: int = 20
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Centralized yt-dlp Options Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_ydl_opts(
+    format_id: Optional[str] = None,
+    outtmpl: Optional[str] = None,
+    is_audio: bool = False,
+    extra_postprocessors: Optional[list] = None
+) -> dict:
+    """
+    Centralized, deterministic yt-dlp options factory.
+    All format extraction, preparation, and downloading use this shared configuration.
+    """
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "socket_timeout": 30,
+        "noplaylist": True,
+        "js_runtimes": {"node": {}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["visionos"]
+            }
+        },
+    }
+
+    cookie_file = get_cookie_file()
+    if cookie_file:
+        opts["cookiefile"] = cookie_file
+
+    if FFMPEG_PATH:
+        opts["ffmpeg_location"] = FFMPEG_PATH
+
+    if format_id:
+        opts["format"] = format_id
+
+    if outtmpl:
+        opts["outtmpl"] = outtmpl
+
+    if is_audio:
+        opts["format"] = "ba/b"
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "0",
+        }]
+
+    if extra_postprocessors:
+        opts.setdefault("postprocessors", []).extend(extra_postprocessors)
+
+    return opts
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Root & Static File Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -157,6 +232,8 @@ async def root(request: Request, json: Optional[int] = Query(None)):
         "yt_dlp": yt_dlp.version.__version__,
         "python": platform.python_version(),
         "ffmpeg": "installed" if FFMPEG_PATH else "missing",
+        "node": NODE_VERSION or "missing",
+        "cookies_configured": bool(get_cookie_file()),
         "status": "online",
     }
 
@@ -188,18 +265,22 @@ async def api_status():
         "yt_dlp": yt_dlp.version.__version__,
         "python": platform.python_version(),
         "ffmpeg": "installed" if FFMPEG_PATH else "missing",
+        "node": NODE_VERSION or "missing",
+        "cookies_configured": bool(get_cookie_file()),
         "status": "online",
     }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Cookie Management (Anti-Bot Bypass)
+# Cookie Management (Safe Metadata & Protected Update)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/cookies")
 async def get_cookies_status():
-    has_cookies = os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 10
-    size = os.path.getsize(COOKIE_FILE) if has_cookies else 0
+    """Safe metadata only: never exposes cookie contents."""
+    cookie_path = get_cookie_file()
+    has_cookies = bool(cookie_path)
+    size = os.path.getsize(cookie_path) if has_cookies else 0
     return {
         "success": True,
         "has_cookies": has_cookies,
@@ -210,9 +291,21 @@ async def get_cookies_status():
 @app.post("/api/cookies")
 async def update_cookies(
     request: Request,
+    authorization: Optional[str] = Header(None),
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
     cookies: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
 ):
+    """
+    Protected cookie update endpoint.
+    If COOKIE_ADMIN_TOKEN is defined in the environment, callers must provide it.
+    """
+    admin_token = os.getenv("COOKIE_ADMIN_TOKEN")
+    if admin_token:
+        provided = x_admin_token or (authorization.replace("Bearer ", "").strip() if authorization else None)
+        if not provided or provided != admin_token:
+            raise HTTPException(status_code=403, detail="Unauthorized: invalid or missing admin token.")
+
     content = ""
     if cookies:
         content = cookies.strip()
@@ -231,7 +324,7 @@ async def update_cookies(
         raise HTTPException(status_code=400, detail="No cookie content provided.")
 
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write(content + "\n")
 
     return {
         "success": True,
@@ -242,27 +335,6 @@ async def update_cookies(
 # ─────────────────────────────────────────────────────────────────────────────
 # Format Extraction
 # ─────────────────────────────────────────────────────────────────────────────
-
-def build_ydl_opts(cookie_file: Optional[str] = None, client_fallback: Optional[list] = None) -> dict:
-    opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
-        "socket_timeout": 30,
-        "noplaylist": True,
-        "js_runtimes": {"node": {}},
-        "extractor_args": {
-            "youtube": {
-                "player_client": client_fallback or ["visionos"]
-            }
-        },
-    }
-    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
-        opts["cookiefile"] = cookie_file
-    if FFMPEG_PATH:
-        opts["ffmpeg_location"] = FFMPEG_PATH
-    return opts
-
 
 @app.api_route("/api/formats", methods=["GET", "POST"])
 async def api_formats(
@@ -284,44 +356,43 @@ async def api_formats(
         raise HTTPException(status_code=422, detail="Only YouTube URLs are supported.")
 
     url = clean_youtube_url(url.strip())
-    cookie_file = get_cookie_file()
+    opts = build_ydl_opts()
 
-    # Try extraction with visionos (Apple Vision Pro API - zero bot detection) then fallbacks
-    strategies = [
-        (True, ["visionos"]),        # VisionOS with cookies (bypasses bot challenge on cloud IPs)
-        (False, ["visionos"]),       # VisionOS WITHOUT cookies
-        (True, ["web_embedded"]),    # Web embedded with cookies
-        (False, ["web_embedded"]),   # Web embedded WITHOUT cookies
-        (True, ["android"]),         # Android client with cookies
-        (False, ["android"]),        # Android client WITHOUT cookies
-        (True, None),                # Default player with cookies
-        (False, None),               # Default WITHOUT cookies
-    ]
+    def extract():
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            return ydl.extract_info(url, download=False)
 
-    info = None
-    last_error = None
+    try:
+        info = await asyncio.to_thread(extract)
+    except Exception as e:
+        raw_err = str(e)
+        # Classify errors safely without exposing credentials
+        if "confirm you're not a bot" in raw_err.lower() or "sign in" in raw_err.lower():
+            if not get_cookie_file():
+                user_msg = "YouTube bot detection encountered. YouTube cookies are not configured on the server."
+            else:
+                user_msg = "YouTube authentication failed. Configured cookies may be expired or invalid."
+        elif "javascript runtime" in raw_err.lower():
+            user_msg = "JavaScript runtime error during YouTube challenge decryption."
+        else:
+            user_msg = "Could not parse video details."
 
-    for use_cookies, client_list in strategies:
-        try:
-            cf = cookie_file if use_cookies else None
-            opts = build_ydl_opts(cookie_file=cf, client_fallback=client_list)
-            def extract():
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    return ydl.extract_info(url, download=False)
-            info = await asyncio.to_thread(extract)
-            if info and info.get("formats"):
-                break
-        except Exception as e:
-            last_error = str(e)
-            continue
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": user_msg,
+                "details": raw_err
+            }
+        )
 
     if not info or not info.get("formats"):
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
-                "error": "Could not parse video details.",
-                "details": last_error or "Unknown extraction failure"
+                "error": "No downloadable formats found for this video.",
+                "details": "yt-dlp returned an empty formats list."
             }
         )
 
@@ -443,40 +514,14 @@ async def api_prepare(
     cleanup_old_downloads()
 
     if not os.path.exists(target_path) or os.path.getsize(target_path) == 0:
-        cookie_file = get_cookie_file()
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "socket_timeout": 30,
-            "js_runtimes": {"node": {}},
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["visionos"]
-                }
-            },
-        }
-        if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
-            ydl_opts["cookiefile"] = cookie_file
-        if FFMPEG_PATH:
-            ydl_opts["ffmpeg_location"] = FFMPEG_PATH
-
-        if is_audio:
-            ydl_opts.update({
-                "format": "ba/b",
-                "outtmpl": os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s"),
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "0",
-                }],
-            })
-        else:
-            ydl_opts.update({
-                "format": format_id,
-                "merge_output_format": "mp4",
-                "outtmpl": os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s"),
-            })
+        outtmpl = os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s")
+        ydl_opts = build_ydl_opts(
+            format_id=format_id,
+            outtmpl=outtmpl,
+            is_audio=is_audio
+        )
+        if not is_audio:
+            ydl_opts["merge_output_format"] = "mp4"
 
         def download():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -562,40 +607,14 @@ async def api_download(
     cleanup_old_downloads()
 
     if not os.path.exists(target_path) or os.path.getsize(target_path) == 0:
-        cookie_file = get_cookie_file()
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "socket_timeout": 30,
-            "js_runtimes": {"node": {}},
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["visionos"]
-                }
-            },
-        }
-        if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
-            ydl_opts["cookiefile"] = cookie_file
-        if FFMPEG_PATH:
-            ydl_opts["ffmpeg_location"] = FFMPEG_PATH
-
-        if is_audio:
-            ydl_opts.update({
-                "format": "ba/b",
-                "outtmpl": os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s"),
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "0",
-                }],
-            })
-        else:
-            ydl_opts.update({
-                "format": format_id,
-                "merge_output_format": "mp4",
-                "outtmpl": os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s"),
-            })
+        outtmpl = os.path.join(DOWNLOADS_DIR, f"dl_{safe_hash}.%(ext)s")
+        ydl_opts = build_ydl_opts(
+            format_id=format_id,
+            outtmpl=outtmpl,
+            is_audio=is_audio
+        )
+        if not is_audio:
+            ydl_opts["merge_output_format"] = "mp4"
 
         def download():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -629,8 +648,8 @@ async def api_download(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# /api/merge - Phone sends direct googlevideo.com CDN URLs, backend merges
-# (Zero bot detection: direct CDN links require no YouTube authentication)
+# /api/merge - Direct GoogleVideo CDN URLs merge
+# (Intentionally separate: direct CDN links require zero YouTube authentication)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.api_route("/api/merge", methods=["GET", "POST", "HEAD"])
@@ -708,7 +727,8 @@ async def api_merge(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# /api/audio-cdn - Phone sends direct audio CDN URL, backend converts to MP3
+# /api/audio-cdn - Direct audio CDN URL conversion
+# (Intentionally separate: direct CDN links require zero YouTube authentication)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.api_route("/api/audio-cdn", methods=["GET", "POST", "HEAD"])
@@ -768,8 +788,20 @@ async def api_audio_cdn(
     )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Direct download from /downloads/{file_name}
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/downloads/{file_name}")
+async def get_download_file(file_name: str):
+    safe_name = os.path.basename(file_name)
+    path = os.path.join(DOWNLOADS_DIR, safe_name)
+    if os.path.exists(path) and os.path.isfile(path):
+        return FileResponse(path, filename=safe_name, media_type="application/octet-stream")
+    raise HTTPException(status_code=404, detail="File not found.")
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8080))
-    print(f"Starting PulseTube Python Backend on port {port}...")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

@@ -251,18 +251,16 @@ def build_ydl_opts(cookie_file: Optional[str] = None, client_fallback: Optional[
         "socket_timeout": 30,
         "noplaylist": True,
         "js_runtimes": {"node": {}},
+        "extractor_args": {
+            "youtube": {
+                "player_client": client_fallback or ["visionos"]
+            }
+        },
     }
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
         opts["cookiefile"] = cookie_file
     if FFMPEG_PATH:
         opts["ffmpeg_location"] = FFMPEG_PATH
-
-    if client_fallback:
-        opts["extractor_args"] = {
-            "youtube": {
-                "player_client": client_fallback
-            }
-        }
     return opts
 
 
@@ -288,15 +286,15 @@ async def api_formats(
     url = clean_youtube_url(url.strip())
     cookie_file = get_cookie_file()
 
-    # Try extraction with standard and fallback clients, both with and without cookies
+    # Try extraction with visionos (Apple Vision Pro API - zero bot detection) then fallbacks
     strategies = [
-        (True, None),                # Default player with cookies
-        (True, ["android"]),         # Android client with cookies
+        (True, ["visionos"]),        # VisionOS with cookies (bypasses bot challenge on cloud IPs)
+        (False, ["visionos"]),       # VisionOS WITHOUT cookies
         (True, ["web_embedded"]),    # Web embedded with cookies
-        (True, ["ios"]),             # iOS with cookies
-        (False, ["android"]),        # Android WITHOUT cookies (bypasses stale cookie rejection)
         (False, ["web_embedded"]),   # Web embedded WITHOUT cookies
-        (False, ["ios"]),            # iOS WITHOUT cookies
+        (True, ["android"]),         # Android client with cookies
+        (False, ["android"]),        # Android client WITHOUT cookies
+        (True, None),                # Default player with cookies
         (False, None),               # Default WITHOUT cookies
     ]
 
@@ -451,8 +449,14 @@ async def api_prepare(
             "no_warnings": True,
             "noplaylist": True,
             "socket_timeout": 30,
+            "js_runtimes": {"node": {}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["visionos"]
+                }
+            },
         }
-        if cookie_file:
+        if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
             ydl_opts["cookiefile"] = cookie_file
         if FFMPEG_PATH:
             ydl_opts["ffmpeg_location"] = FFMPEG_PATH
@@ -564,8 +568,14 @@ async def api_download(
             "no_warnings": True,
             "noplaylist": True,
             "socket_timeout": 30,
+            "js_runtimes": {"node": {}},
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["visionos"]
+                }
+            },
         }
-        if cookie_file:
+        if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 10:
             ydl_opts["cookiefile"] = cookie_file
         if FFMPEG_PATH:
             ydl_opts["ffmpeg_location"] = FFMPEG_PATH

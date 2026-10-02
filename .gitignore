@@ -1,4 +1,5 @@
 
 yt-backend/downloads/
-
 ffmpeg-master-latest-win64-gpl/
+__pycache__/
+*.pyc

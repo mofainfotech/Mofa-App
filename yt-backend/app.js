@@ -106,8 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
         badgeYtDlp.textContent = `yt-dlp ${data.yt_dlp}`;
         footerYtDlpVer.textContent = data.yt_dlp;
       }
-      if (data.php) {
-        badgePhp.textContent = `PHP ${data.php}`;
+      if (data.python) {
+        badgePhp.textContent = `Python ${data.python}`;
+        footerPhpVer.textContent = `Python ${data.python}`;
+      } else if (data.php) {
+        badgePhp.textContent = `${data.php}`;
         footerPhpVer.textContent = data.php;
       }
       if (data.ffmpeg) {

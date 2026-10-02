@@ -42,20 +42,31 @@ if not FFMPEG_PATH and os.name == "nt":
     if os.path.exists(win_ffmpeg):
         FFMPEG_PATH = win_ffmpeg
 
+NODE_PATH = shutil.which("node")
 NODE_VERSION = None
+if NODE_PATH:
+    try:
+        node_out = subprocess.check_output([NODE_PATH, "--version"], stderr=subprocess.DEVNULL).decode().strip()
+        NODE_VERSION = node_out
+    except Exception:
+        NODE_VERSION = None
+
+EJS_VERSION = None
 try:
-    node_out = subprocess.check_output(["node", "--version"], stderr=subprocess.DEVNULL).decode().strip()
-    NODE_VERSION = node_out
-except Exception:
-    NODE_VERSION = None
+    import yt_dlp_ejs
+    EJS_VERSION = getattr(yt_dlp_ejs, "__version__", getattr(yt_dlp_ejs, "version", "available"))
+except ImportError:
+    EJS_VERSION = None
 
 # Startup Diagnostics (Safe: NEVER log cookie content or secrets)
 print("=" * 60)
 print("Starting PulseTube Python Backend...")
 print(f"  Python:          {platform.python_version()}")
 print(f"  yt-dlp:          {yt_dlp.version.__version__}")
+print(f"  yt-dlp-ejs:      {EJS_VERSION if EJS_VERSION else 'missing'}")
 print(f"  FFmpeg:          {'installed (' + FFMPEG_PATH + ')' if FFMPEG_PATH else 'missing'}")
-print(f"  Node.js:         {NODE_VERSION if NODE_VERSION else 'missing'}")
+print(f"  Node.js:         {f'{NODE_VERSION} ({NODE_PATH})' if NODE_VERSION else 'missing'}")
+print(f"  PO Token status: none (not required for standard clients)")
 if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 10:
     print(f"  YouTube cookies: available (Cookie file: {COOKIE_FILE}, size: {os.path.getsize(COOKIE_FILE)} bytes)")
 else:
@@ -174,16 +185,17 @@ def build_ydl_opts(
     Centralized, deterministic yt-dlp options factory.
     All format extraction, preparation, and downloading use this shared configuration.
     """
+    js_runtime_cfg = {"node": {"path": NODE_PATH}} if NODE_PATH else {"node": {}}
     opts = {
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
         "socket_timeout": 30,
         "noplaylist": True,
-        "js_runtimes": {"node": {}},
+        "js_runtimes": js_runtime_cfg,
         "extractor_args": {
             "youtube": {
-                "player_client": ["visionos"]
+                "player_client": ["default", "web_embedded"]
             }
         },
     }
@@ -230,6 +242,7 @@ async def root(request: Request, json: Optional[int] = Query(None)):
     return {
         "api": "Fast YouTube Downloader Backend (Python FastAPI)",
         "yt_dlp": yt_dlp.version.__version__,
+        "yt_dlp_ejs": EJS_VERSION or "missing",
         "python": platform.python_version(),
         "ffmpeg": "installed" if FFMPEG_PATH else "missing",
         "node": NODE_VERSION or "missing",
@@ -358,14 +371,20 @@ async def api_formats(
     url = clean_youtube_url(url.strip())
     opts = build_ydl_opts()
 
+    print(f"[formats] Processing URL: {url}")
+    print(f"[formats] yt-dlp: {yt_dlp.version.__version__}, python: {platform.python_version()}, node: {NODE_VERSION}, ejs: {EJS_VERSION}")
+
     def extract():
         with yt_dlp.YoutubeDL(opts) as ydl:
             return ydl.extract_info(url, download=False)
 
     try:
         info = await asyncio.to_thread(extract)
+        raw_count = len(info.get("formats", [])) if info else 0
+        print(f"[formats] Extraction successful. Raw formats found: {raw_count}")
     except Exception as e:
         raw_err = str(e)
+        print(f"[formats] Extraction failed: {raw_err}")
         # Classify errors safely without exposing credentials
         if "confirm you're not a bot" in raw_err.lower() or "sign in" in raw_err.lower():
             if not get_cookie_file():

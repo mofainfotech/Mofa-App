@@ -20,8 +20,9 @@ WORKDIR /app
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Verify yt-dlp import during build
-RUN python -c "import yt_dlp; print(yt_dlp.version.__version__)"
+# Verify yt-dlp and yt_dlp_ejs import during build
+RUN python -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
+RUN python -c "import yt_dlp_ejs; print('yt_dlp_ejs OK:', yt_dlp_ejs.__file__)"
 
 # Copy application source
 COPY . /app/

@@ -1,6 +1,6 @@
 /**
  * PulseTube - YouTube Downloader & Streamer Client
- * Connects to PHP backend (Core PHP + yt-dlp + FFmpeg)
+ * Connects to Python FastAPI backend (FastAPI + yt-dlp + FFmpeg)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,10 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusText         = document.getElementById('statusText');
   const systemBadges       = document.getElementById('systemBadges');
   const badgeYtDlp         = document.getElementById('badgeYtDlp');
-  const badgePhp           = document.getElementById('badgePhp');
+  const badgePython        = document.getElementById('badgePython');
   const badgeFfmpeg        = document.getElementById('badgeFfmpeg');
   const btnRefreshStatus   = document.getElementById('btnRefreshStatus');
-  const footerPhpVer       = document.getElementById('footerPhpVer');
+  const footerPythonVer    = document.getElementById('footerPythonVer');
   const footerYtDlpVer     = document.getElementById('footerYtDlpVer');
 
   const searchForm         = document.getElementById('searchForm');
@@ -107,11 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
         footerYtDlpVer.textContent = data.yt_dlp;
       }
       if (data.python) {
-        badgePhp.textContent = `Python ${data.python}`;
-        footerPhpVer.textContent = `Python ${data.python}`;
-      } else if (data.php) {
-        badgePhp.textContent = `${data.php}`;
-        footerPhpVer.textContent = data.php;
+        badgePython.textContent = `Python ${data.python}`;
+        footerPythonVer.textContent = `Python ${data.python}`;
       }
       if (data.ffmpeg) {
         badgeFfmpeg.textContent = `FFmpeg: ${data.ffmpeg}`;

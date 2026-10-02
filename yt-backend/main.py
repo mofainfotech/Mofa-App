@@ -156,7 +156,6 @@ async def root(request: Request, json: Optional[int] = Query(None)):
         "api": "Fast YouTube Downloader Backend (Python FastAPI)",
         "yt_dlp": yt_dlp.version.__version__,
         "python": platform.python_version(),
-        "php": f"Python {platform.python_version()}",
         "ffmpeg": "installed" if FFMPEG_PATH else "missing",
         "status": "online",
     }
@@ -188,7 +187,6 @@ async def api_status():
         "api": "Fast YouTube Downloader Backend (Python FastAPI)",
         "yt_dlp": yt_dlp.version.__version__,
         "python": platform.python_version(),
-        "php": f"Python {platform.python_version()}",
         "ffmpeg": "installed" if FFMPEG_PATH else "missing",
         "status": "online",
     }

@@ -313,14 +313,108 @@ if ($path === '/api/prepare') {
         $cmdOutput = executeCliCommand($cmd);
     }
 
+    if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false, 
+            'error'   => 'Failed to process media file with yt-dlp/ffmpeg.',
+            'details' => $cmdOutput ?: 'No output from command'
+        ]);
+        exit;
+    }
 
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST'];
+    $baseUrl = "$protocol://$host" . str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']);
+    $readyUrl = $baseUrl . "/api/download?file=" . urlencode($localFileName) . "&title=" . urlencode($cleanTitle) . "&ext=" . $ext;
 
+    echo json_encode([
+        'success'      => true,
+        'ready'        => true,
+        'file_name'    => "{$cleanTitle}.{$ext}",
+        'size_bytes'   => filesize($absolutePath),
+        'download_url' => $readyUrl
+    ]);
+    exit;
+}
 
+if ($path === '/api/download') {
+    @set_time_limit(600); // 10 minutes max for high-res merges
 
+    // Instant download for prepared/cached files by filename
+    if (!empty($_GET['file'])) {
+        $fileName = basename($_GET['file']);
+        $filePath = $downloadsDir . DIRECTORY_SEPARATOR . $fileName;
+        if (file_exists($filePath) && filesize($filePath) > 0) {
+            $title = $_GET['title'] ?? 'YouTube_Media';
+            $ext = $_GET['ext'] ?? pathinfo($fileName, PATHINFO_EXTENSION);
+            $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
+            $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle)) ?: 'YouTube_Media';
+            $outputName = "{$cleanTitle}.{$ext}";
+
+            while (ob_get_level()) { ob_end_clean(); }
+            header("Content-Description: File Transfer");
+            header("Content-Type: application/octet-stream");
+            header("Content-Disposition: attachment; filename=\"" . addslashes($outputName) . "\"; filename*=UTF-8''" . rawurlencode($outputName));
+            header("Content-Transfer-Encoding: binary");
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+            header("Pragma: public");
+            header("Content-Length: " . filesize($filePath));
+            readfile($filePath);
+            exit;
+        }
+    }
+
+    $url      = $_GET['url'] ?? '';
+    $formatId = $_GET['format_id'] ?? '';
+    $title    = $_GET['title'] ?? 'YouTube_Media';
+    $isStream = isset($_GET['stream']) && $_GET['stream'] === '1';
+
+    if (empty($url) || empty($formatId)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Missing url or format_id.']);
+        exit;
+    }
+
+    $isAudio = (isset($_GET['type']) && $_GET['type'] === 'audio') || 
+               (isset($_GET['ext']) && $_GET['ext'] === 'mp3') || 
+               in_array($formatId, ['140', '251', '139', '249', 'ba', 'bestaudio']);
+               
+    $ext = $isAudio ? 'mp3' : 'mp4';
+
+    // Clean title for safe filesystem & download filename
+    $cleanTitle = preg_replace('/[^\w\s\-\.\(\)]/u', '_', $title);
+    $cleanTitle = trim(preg_replace('/\s+/', ' ', $cleanTitle));
+    if (empty($cleanTitle)) $cleanTitle = 'YouTube_Media';
+    $downloadOutputName = "{$cleanTitle}.{$ext}";
+
+    // Strip playlist parameters
+    $cleanUrl = preg_replace('/&list=[^&]+/', '', $url);
+    $cleanUrl = preg_replace('/&index=[^&]+/', '', $cleanUrl);
+    $cleanUrl = preg_replace('/&start_radio=[^&]+/', '', $cleanUrl);
+
+    // Unique local cached filename
+    $safeHash = md5($cleanUrl . '_' . $formatId . '_' . $ext);
+    $localFileName = "dl_{$safeHash}.{$ext}";
+    $absolutePath = $downloadsDir . DIRECTORY_SEPARATOR . $localFileName;
+
+    $safeUrl = escapeshellarg($cleanUrl);
+    $safeFmt = escapeshellarg($formatId);
+
+    // If file does not exist on server yet, download and process it with yt-dlp + ffmpeg
+    $ffmpegParam = $isWindows ? ("--ffmpeg-location " . escapeshellarg($ffmpeg)) : "";
+    $cookieParam = getCookieParam($cookieFile);
+    $extraArgs = "--extractor-args \"youtube:player_client=android,web\" --user-agent \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36\"";
+    if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
+        if ($isAudio) {
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f \"ba/b\" -x --audio-format mp3 --audio-quality 0 $ffmpegParam --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+        } else {
+            $cmd = escapeshellarg($ytdlp) . " $cookieParam $extraArgs --no-playlist -f $safeFmt $ffmpegParam --merge-output-format mp4 --js-runtimes node --no-warnings --no-update -o " . escapeshellarg($absolutePath) . " $safeUrl 2>&1";
+        }
 
         $cmdOutput = executeCliCommand($cmd);
     }
-
 
     if (!file_exists($absolutePath) || filesize($absolutePath) === 0) {
         http_response_code(500);
